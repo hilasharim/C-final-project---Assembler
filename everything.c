@@ -1,11 +1,3 @@
-/******************************************************************************
-
-                            Online C Compiler.
-                Code, Compile, Run and Debug C program online.
-Write your code in this editor and press "Run" button to compile and execute it.
-
-*******************************************************************************/
-
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -731,11 +723,23 @@ int dataStringInstruction(int lineNumber, int instruction, char *operand, char d
 }
 
 int externInstruction(int lineNumber, char *operand, labelList *allLabelsList) {
+    if (!isLabelLegal(operand)) {
+        fprintf(stderr, "Error in line %d: Illegal label name in .extern instruction\n", lineNumber);
+        return 0;
+    }
     if (containsName(allLabelsList, operand)) {
         fprintf(stderr, "Error in line %d: label has already been declared\n", lineNumber);
         return 0;
     }
     addLabel(allLabelsList, operand, 0, 0, 0, 1, 0, 0);
+    return 1;
+}
+
+int entryInstruction(int lineNumber, char *operand) {
+    if (!isLabelLegal(operand)) {
+        fprintf(stderr, "Error in line %d: Illegal label name in .entry instruction\n", lineNumber);
+        return 0;
+    }
     return 1;
 }
 
@@ -746,6 +750,10 @@ int parseInstructions(int lineNumber, char *operand, int *DC, int instructionInd
     /*.data or .string*/
     if (instructionIndex == 0 || instructionIndex == 1) {
         instructionParseResult = dataStringInstruction(lineNumber, instructionIndex, trimmedOperand, dataArray, label, existsLabelFlag, allLabelsList, DC);
+    }
+    /*.entry*/
+    if (instructionIndex == 2) {
+        instructionParseResult = entryInstruction(lineNumber,trimmedOperand);
     }
     /*.extern*/
     if (instructionIndex == 3) {
@@ -847,15 +855,13 @@ int main()
 {
     char commandsArray[100][MAX_WORD_LEN+1];
     char dataArray[100][MAX_WORD_LEN+1];
-    int IC = 0;
-    int DC = 0;
-    int errorFlag;
-    int parseInstructionResult;
+    int IC, DC, errorFlag, parseInstructionResult;
+    IC = DC = errorFlag = parseInstructionResult = 0;
     labelList *allLabelsList = createList();
     char trimmedLine[MAX_TOKEN_LEN+1];
-    char lines[][MAX_TOKEN_LEN+1] = {"MAIN: mov r3, LENGTH", "      ", "  ; dfgg", "LOOP: jmp L1(#-1,r6)", 
+    char lines[][MAX_TOKEN_LEN+1] = {"MAIN: mov r3, LENGTH", ".entry ABC", "  ; dfgg", "LOOP: jmp L1(#-1,r6)", 
         "prn #-5", "bne LOOP(r4,r5)", "sub r1, r4", "bne END", "L1: inc K", "bne LOOP(K,STR)",
-        "END: stop", "STR: .string \"abcdef\"", "LENGTH: .data 6,-9,15", "K: .data 22"};
+        "END: stop", "STR: .string \"abcdef\"", "LENGTH: .data 6, -9 ,15", "K: .data 22"};
     for (int row = 0; row <14; row++) {
         if (isStringEmpty(lines[row], strlen(lines[row]))) {
             continue;
