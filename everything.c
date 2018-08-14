@@ -1,3 +1,11 @@
+/******************************************************************************
+
+                            Online C Compiler.
+                Code, Compile, Run and Debug C program online.
+Write your code in this editor and press "Run" button to compile and execute it.
+
+*******************************************************************************/
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -17,6 +25,7 @@
 #define ARE_LEN 2
 #define NUM_ADDRESSING_TYPES 4
 #define EMPTY_COMMAND "00000000000000"
+#define MEMORY_START_POS 100
 
 typedef struct label {
     char name[MAX_TOKEN_LEN+1];
@@ -42,15 +51,21 @@ char registersCodeValues[][MAX_REGISTER_LEN+1] = {"000000", "000001", "000010", 
 
 char instructions[][MAX_TOKEN_LEN+1] = {".data", ".string", ".entry", ".extern"};
 
-char operations[][MAX_TOKEN_LEN+1] = {"mov", "cmp", "add", "sub", "not", "clr", "lea", "inc", "dec", "jmp", "bne", "red", "prn", "jsr", "rts", "stop"};
+char operations[][MAX_TOKEN_LEN+1] = {"mov", "cmp", "add", "sub", "not", "clr", "lea",
+                                            "inc", "dec", "jmp", "bne", "red", "prn", "jsr",
+                                            "rts", "stop"};
 
-char opcodes[][MAX_OPCODE_LEN+1] = {"0000", "0001", "0010", "0011", "0100", "0101", "0110", "0111", "1000", "1001", "1010", "1011",
+char opcodes[][MAX_OPCODE_LEN+1] = {"0000", "0001", "0010", "0011", "0100", "0101", 
+                                    "0110", "0111", "1000", "1001", "1010", "1011",
                                     "1100", "1101", "1110", "1111"};
 
-int allowedSrcAddressingTypes[][NUM_ADDRESSING_TYPES] = {{0,1,3},{0,1,3},{0,1,3},{0,1,3},{},{},{1}};
+int allowedSrcAddressingTypes[][NUM_ADDRESSING_TYPES] = {{0,1,3},{0,1,3},{0,1,3},{0,1,3},{},
+                                                          {},{1}};
 int allowedSrcAddressingTypesNum[] = {3,3,3,3,0,0,1};
 
-int allowedDestAddressingTypes[][NUM_ADDRESSING_TYPES] = {{1,3},{0,1,3},{1,3},{1,3},{1,3},{1,3},{1,3},{1,3},{1,3},{1,2,3},{1,2,3},{1,3},{0,1,3},{1,2,3}};
+int allowedDestAddressingTypes[][NUM_ADDRESSING_TYPES] = {{1,3},{0,1,3},{1,3},{1,3},{1,3},
+                                                          {1,3},{1,3},{1,3},{1,3},{1,2,3},
+                                                          {1,2,3},{1,3},{0,1,3},{1,2,3}};
 int allowedDestAddressingTypesNum[] = {2,3,2,2,2,2,2,2,2,3,3,2,3,3};
 
 const int totalRegisters = 8;
@@ -689,7 +704,7 @@ int dataStringInstruction(int lineNumber, int instruction, char *operand, char d
             return 0;
         }
         else {
-            addLabel(allLabelsList, label, *DC, 1, 0, 0, 0, 1);
+            addLabel(allLabelsList, label, (*DC)+MEMORY_START_POS, 1, 0, 0, 0, 1);
         }
     }
     if (instruction == 0) { /*data*/
@@ -749,7 +764,7 @@ int parseOperator(int lineNumber, char *operand, int *IC, int operatorIndex, cha
             return 0;
         }
         else {
-            addLabel(allLabelsList, label, *IC, 0, 1, 0, 0, 1);
+            addLabel(allLabelsList, label, (*IC)+MEMORY_START_POS, 0, 1, 0, 0, 1);
         }
     }
     /*two operand commands*/
@@ -832,19 +847,35 @@ int main()
 {
     char commandsArray[100][MAX_WORD_LEN+1];
     char dataArray[100][MAX_WORD_LEN+1];
-    char targetArray[100][MAX_TOKEN_LEN+1];
     int IC = 0;
     int DC = 0;
+    int errorFlag;
     int parseInstructionResult;
     labelList *allLabelsList = createList();
-    char line[MAX_TOKEN_LEN+1] = "K: .data 22";
-    parseInstructionResult = parseLine(line, 1, &DC, &IC, dataArray, commandsArray, allLabelsList);
-    printf("%d\n", parseInstructionResult);
-    printf("%d\n", DC);
-    printf("%d\n", IC);
-    for (int i=0; i < DC; i++) {
-        printf("%s\n", dataArray[i]);
+    char trimmedLine[MAX_TOKEN_LEN+1];
+    char lines[][MAX_TOKEN_LEN+1] = {"MAIN: mov r3, LENGTH", "      ", "  ; dfgg", "LOOP: jmp L1(#-1,r6)", 
+        "prn #-5", "bne LOOP(r4,r5)", "sub r1, r4", "bne END", "L1: inc K", "bne LOOP(K,STR)",
+        "END: stop", "STR: .string \"abcdef\"", "LENGTH: .data 6,-9,15", "K: .data 22"};
+    for (int row = 0; row <14; row++) {
+        if (isStringEmpty(lines[row], strlen(lines[row]))) {
+            continue;
+        }
+        trimString(lines[row], trimmedLine, strlen(lines[row]));
+        if (trimmedLine[0] == COMMENT_CHAR) {
+            continue;
+        }
+        if (!parseLine(trimmedLine, row+1, &DC, &IC, dataArray, commandsArray, allLabelsList)) {
+            errorFlag++;
+        }
     }
+    printf("There were %d errors\n", errorFlag);
+    for (int i=0; i < IC; i++) {
+        printf("%s\n", commandsArray[i]);
+    }
+    for (int j=0; j < DC; j++) {
+        printf("%s\n", dataArray[j]);
+    }
+    incrementDataLabels (allLabelsList, IC);
     printList(allLabelsList);
     freeList (allLabelsList);
 
