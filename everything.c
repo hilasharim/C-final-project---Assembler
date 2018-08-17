@@ -3,10 +3,13 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-#define MAX_TOKEN_LEN 80
-#define MAX_LABEL_LEN 30
+#define MAX_LINE_LEN 80
+#define MAX_TOKEN_LEN 30
 #define MAX_OPCODE_LEN 4
 #define MAX_REGISTER_LEN 6
+#define ARE_LEN 2
+#define PARAMETER_LEN 2
+#define ADDRESSING_LEN 2
 #define STRING_ENCLOSER '\"'
 #define COMMENT_CHAR ';'
 #define IM_ADDRESSING_CHAR '#'
@@ -14,7 +17,6 @@
 #define ZERO_ASCII_VAL 48
 #define MAX_PARAMETERS 200
 #define MAX_ASCII_LEN 3
-#define ARE_LEN 2
 #define NUM_ADDRESSING_TYPES 4
 #define EMPTY_COMMAND "00000000000000"
 #define MEMORY_START_POS 100
@@ -35,7 +37,6 @@ typedef struct labelList {
     label *last;
 } labelList;
 
-
 char registers[][MAX_TOKEN_LEN+1] = {"r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"};
 
 char registersCodeValues[][MAX_REGISTER_LEN+1] = {"000000", "000001", "000010", "000011",
@@ -50,6 +51,8 @@ char operations[][MAX_TOKEN_LEN+1] = {"mov", "cmp", "add", "sub", "not", "clr", 
 char opcodes[][MAX_OPCODE_LEN+1] = {"0000", "0001", "0010", "0011", "0100", "0101", 
                                     "0110", "0111", "1000", "1001", "1010", "1011",
                                     "1100", "1101", "1110", "1111"};
+
+int numParameters[] = {2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 0, 0};
 
 int allowedSrcAddressingTypes[][NUM_ADDRESSING_TYPES] = {{0,1,3},{0,1,3},{0,1,3},{0,1,3},{},
                                                           {},{1}};
@@ -68,7 +71,7 @@ const int totalOperations = 16;
 labelList* createList() {
     labelList *newList = (labelList*)malloc(sizeof(labelList));
     if (!newList) {
-        fprintf(stderr, "Unable to allocate memory. Terminaating.");
+        fprintf(stderr, "Unable to allocate memory. Terminating.\n");
         exit(1);
     }
     else {
@@ -81,7 +84,7 @@ labelList* createList() {
 void addLabel(labelList *list, char* newName, int newVal, char newDataFlag, char newCodeFlag, char newExternFlag, char newEntryFlag, char newRealocFlag) {
     label *newLabel = (label*)malloc(sizeof(label));
     if (!newLabel) {
-        fprintf(stderr, "Unable to allocate memory. Terminaating.");
+        fprintf(stderr, "Unable to allocate memory. Terminating.\n");
         exit(1);
     }
     else {
@@ -131,7 +134,7 @@ void printList (labelList *list) {
 int containsName (labelList *list, char *searchTerm) {
     int found = 0;
     label *current = list -> head;
-    while (current != NULL && found == 0) {
+    while (current != NULL && !found) {
         if (strcmp(current -> name, searchTerm) == 0) {
             found = 1;
         }
@@ -150,6 +153,39 @@ void incrementDataLabels (labelList *list, int incrementValue) {
         }
         current = current -> next;
     }
+}
+
+/*return 1 if found and updated, 0 if not found, -1 if found but declared as extern*/
+int setEntryFlag (labelList *list, char labelName[MAX_TOKEN_LEN+1]) {
+    int found = 0;
+    label *current = list -> head;
+    while (current != NULL && !found) {
+        if (strcmp(current -> name, labelName) == 0) {
+            found = 1;
+            if (current -> externFlag == 1) {
+                return -1;
+            }
+            current -> entryFlag = 1;
+        }
+        current = current -> next;
+    }
+    return found;
+}
+
+/*return 0 if label not found in list and 1 otherwise. copy relevant values to target variables*/
+int getLabelValueARE(labelList *list, char labelName[MAX_TOKEN_LEN+1], int *valueTarget, int *RFlagTarget, int *EFlagTarget) {
+    int found = 0;
+    label *current = list -> head;
+    while (current != NULL && !found) {
+        if (strcmp(current -> name, labelName) == 0) {
+            found = 1;
+            *valueTarget = current -> value;
+            *RFlagTarget = current -> realocFlag;
+            *EFlagTarget = current -> externFlag;
+        }
+        current = current -> next;
+    }
+    return found;
 }
 
 /*function to check if the given number of bytes in the string are only whitespace characters. goes over string character by character.*/
@@ -531,12 +567,12 @@ int parseSingleOperand(char *operand, char operandValuesArray[][MAX_TOKEN_LEN+1]
 void buildFirstCommandWord(int param1Addressing, int param2Addressing, int command, int srcAddressing, int destAddressing, int ARE, char commandTarget[]) {
     const char numTranslations[][3] = {"00", "01", "10", "11"};
     strcpy(commandTarget, EMPTY_COMMAND);
-    strncpy(commandTarget, numTranslations[param1Addressing], 2);
-    strncpy(commandTarget+2, numTranslations[param2Addressing], 2);
-    strncpy(commandTarget+4, opcodes[command], MAX_OPCODE_LEN);
-    strncpy(commandTarget+8, numTranslations[srcAddressing], 2);
-    strncpy(commandTarget+10, numTranslations[destAddressing], 2);
-    strncpy(commandTarget+12, numTranslations[ARE], 2);
+    strncpy(commandTarget, numTranslations[param1Addressing], PARAMETER_LEN);
+    strncpy(commandTarget+PARAMETER_LEN, numTranslations[param2Addressing], PARAMETER_LEN);
+    strncpy(commandTarget+2*PARAMETER_LEN, opcodes[command], MAX_OPCODE_LEN);
+    strncpy(commandTarget+2*PARAMETER_LEN+MAX_OPCODE_LEN, numTranslations[srcAddressing], ADDRESSING_LEN);
+    strncpy(commandTarget+2*PARAMETER_LEN+MAX_OPCODE_LEN+ADDRESSING_LEN, numTranslations[destAddressing], ADDRESSING_LEN);
+    strncpy(commandTarget+2*PARAMETER_LEN+MAX_OPCODE_LEN+2*ADDRESSING_LEN, numTranslations[ARE], ARE_LEN);
 }
 
 void buildRegistersWord(char *srcRegister, char *destRegister, char commandTarget[]) {
@@ -776,7 +812,7 @@ int parseOperator(int lineNumber, char *operand, int *IC, int operatorIndex, cha
         }
     }
     /*two operand commands*/
-    if ((operatorIndex >= 0 && operatorIndex <= 3) || operatorIndex == 6) {
+    if (numParameters[operatorIndex] == 2) {
         operatorParseResult = parseOperatorWithTwoOperands(operand, operatorIndex, allowedSrcAddressingTypes[operatorIndex], allowedSrcAddressingTypesNum[operatorIndex], allowedDestAddressingTypes[operatorIndex], allowedDestAddressingTypesNum[operatorIndex], commandsArray, IC);
         if (operatorParseResult == -2) {
             fprintf(stderr, "Error in line %d: Illegal number of operands. Expected two\n", lineNumber);
@@ -792,7 +828,7 @@ int parseOperator(int lineNumber, char *operand, int *IC, int operatorIndex, cha
         }
     }
     /*one operand commands*/
-    else if (operatorIndex == 4 || operatorIndex == 5 || (operatorIndex >= 7 && operatorIndex <= 13)) {
+    else if (numParameters[operatorIndex] == 1) {
         operatorParseResult = parseOneOperandCommand(operand, operatorIndex, allowedDestAddressingTypes[operatorIndex], allowedDestAddressingTypesNum[operatorIndex], commandsArray, IC);
         if (operatorParseResult == -1) {
             fprintf(stderr, "Error in line %d: Illegal addressing method for operator\n", lineNumber);
@@ -851,6 +887,156 @@ int parseLine(char *line, int lineNumber, int *DC, int *IC, char dataArray[][MAX
     return parseInstructionResult;
 }
 
+//from here second pass
+void buildLabelAddressWord(int labelAddress, int RFlag, int EFlag, char commandTarget[]) {
+    const char ARE[][ARE_LEN] = {"00", "10", "01"};
+    char addressAsString[MAX_WORD_LEN+1];
+    char tempNumOperand[MAX_WORD_LEN+1];
+    sprintf(addressAsString, "%d", labelAddress);
+    parseInteger(addressAsString, tempNumOperand);
+    strcpy(commandTarget, EMPTY_COMMAND);
+    strncpy(commandTarget, tempNumOperand+ARE_LEN, MAX_WORD_LEN-ARE_LEN);
+    if (RFlag) {
+        strncpy(commandTarget + MAX_WORD_LEN - ARE_LEN, ARE[1], ARE_LEN);
+    }
+    else if(EFlag) {
+        strncpy(commandTarget + MAX_WORD_LEN - ARE_LEN, ARE[2], ARE_LEN);
+    }
+}
+
+int parseLabelOperandSecondPass(char labelName[], char commandTarget[], labelList *allLabelsList, labelList *externList, int commandPosition) {
+    int labelFoundFlag, labelValue, labelRFlag, labelEFlag;
+    labelFoundFlag = getLabelValueARE(allLabelsList, labelName, &labelValue, &labelRFlag, &labelEFlag);
+    if (!labelFoundFlag) {
+        return 0;
+    }
+    buildLabelAddressWord(labelValue, labelRFlag, labelEFlag, commandTarget);
+    if (labelEFlag) {
+        addLabel(externList, labelName, commandPosition+MEMORY_START_POS, 0, 0, 0, 0, 0);
+    }
+    return 1;
+}
+
+/*return 0 if label not found, 1 if successful*/
+int parseOneOperandCommandSecondPass(char *operand, char commandsArray[][MAX_WORD_LEN+1], int *IC, labelList *allLabelsList, labelList *externList) {
+    int addressingMethod, currOperand;
+    char operandValues[MAX_PARAMETERS][MAX_TOKEN_LEN+1];
+    int operandAddressing[MAX_PARAMETERS];
+    addressingMethod = parseSingleOperand(operand, operandValues, operandAddressing);
+    (*IC)++; //skip first word
+    if (addressingMethod == 1 || addressingMethod == 2) {
+        if (!parseLabelOperandSecondPass(operandValues[0], commandsArray[*IC], allLabelsList, externList, *IC)) {
+            return 0;
+        }
+    }
+    (*IC)++;
+    
+    if (addressingMethod == 2 && operandAddressing[0] == 3 && operandAddressing[1] == 3) {
+        (*IC)++;
+    }
+    else if (addressingMethod == 2) {
+        for (currOperand = 0; currOperand < 2; currOperand++) {
+            if (operandAddressing[currOperand] == 1) {
+                if (!parseLabelOperandSecondPass(operandValues[currOperand+1], commandsArray[*IC], allLabelsList, externList, *IC)) {
+                    return 0;
+                }
+            }
+            (*IC)++;
+        }
+    }
+    return 1;
+}
+
+int parseOperatorWithTwoOperandsSecondPass(char *string, char commandsArray[][MAX_WORD_LEN+1], int *IC, labelList *allLabelsList, labelList *externList) {
+    int srcOperandAddressing, destOperandAddressing, exactlyTwoOperands;
+    char splitOperands [MAX_PARAMETERS][MAX_TOKEN_LEN+1];
+    char operandValues [MAX_PARAMETERS][MAX_TOKEN_LEN+1];
+    int operandAddressingArray[MAX_PARAMETERS];
+    
+    exactlyTwoOperands = getTwoOperands(string, splitOperands);
+    srcOperandAddressing = parseSingleOperand(splitOperands[0], operandValues, operandAddressingArray);
+    destOperandAddressing = parseSingleOperand(splitOperands[1], operandValues+1, operandAddressingArray);
+    (*IC)++; /*skip first word*/
+    if (srcOperandAddressing == 3 && destOperandAddressing == 3) {
+        (*IC)++;
+        return 1;
+    }
+    if (srcOperandAddressing == 1) {
+        if (!parseLabelOperandSecondPass(splitOperands[0], commandsArray[*IC], allLabelsList, externList, *IC)) {
+            return 0;
+        }
+    }
+    (*IC)++;
+    if (destOperandAddressing == 1) {
+        if (!parseLabelOperandSecondPass(splitOperands[1], commandsArray[*IC], allLabelsList, externList, *IC)) {
+            return 0;
+        }
+    }
+    (*IC)++;
+    return 1;
+}
+
+int parseOperatorSecondPass(int lineNumber, char *operand, int *IC, int operatorIndex, char commandsArray[][MAX_WORD_LEN+1], labelList *allLabelsList, labelList *externList) {
+    char trimmedOperand[MAX_TOKEN_LEN+1];
+    trimString(operand, trimmedOperand, strlen(operand));
+    int operatorParseResult = 0;
+    /*two operand commands*/
+    if (numParameters[operatorIndex] == 2) {
+        operatorParseResult = parseOperatorWithTwoOperandsSecondPass(trimmedOperand, commandsArray, IC, allLabelsList, externList);
+    }
+    /*one operand commands*/
+    else if (numParameters[operatorIndex] == 1) {
+        operatorParseResult = parseOneOperandCommandSecondPass(trimmedOperand, commandsArray, IC, allLabelsList, externList);
+    }
+    /*no operand commands - nothing to do, just increment IC*/
+    else {
+        operatorParseResult = 1;
+        (*IC)++;
+    }
+    if (!operatorParseResult) {
+        fprintf(stderr, "Error in line %d: Usage of undeclared label\n", lineNumber);
+        return 0;
+    }
+    return 1;
+}
+
+int parseEntrySecondPass(int lineNumber, char labelname[MAX_TOKEN_LEN+1], labelList *allLabelsList) {
+    int parseResult = setEntryFlag(allLabelsList, labelname);
+    if (parseResult == 0 ) {
+        fprintf(stderr, "Error in line %d: .entry label not found in symbol table\n", lineNumber);
+        return 0;
+    }
+    if (parseResult == -1) {
+        fprintf(stderr, "Error in line %d: .entry label already declared as external\n", lineNumber);
+        return 0;
+    }
+    return 1;
+}
+
+int parseLineSecondPass(char *line, int lineNumber, int *IC, char commandsArray[][MAX_WORD_LEN+1], labelList *allLabelsList, labelList *externList) {
+    char label[MAX_TOKEN_LEN+1], restOfString[MAX_TOKEN_LEN+1], trimmedRestOfString[MAX_TOKEN_LEN+1], operand[MAX_TOKEN_LEN+1];
+    int instruction, parseInstructionResult, getlabelResult;
+    
+    getlabelResult = getLabel(line, label, restOfString);
+    trimString(restOfString, trimmedRestOfString, strlen(restOfString));
+    /*check if .data .string .entry .extern*/
+    instruction = getInstruction(trimmedRestOfString, instructions, totalInstructions, operand);
+    if (instruction >= 0) {
+        if (instruction == 2) {
+            parseInstructionResult = parseEntrySecondPass(lineNumber, operand, allLabelsList);
+        }
+        else {
+            parseInstructionResult = 1;
+        }
+    }
+    else {
+        /*must be recognized operation (mov, bne etc.)*/
+        instruction = getInstruction(trimmedRestOfString, operations, totalOperations, operand);
+        parseInstructionResult = parseOperatorSecondPass(lineNumber, operand, IC, instruction, commandsArray, allLabelsList, externList);
+    }
+    return parseInstructionResult;
+}
+
 int main()
 {
     char commandsArray[100][MAX_WORD_LEN+1];
@@ -859,10 +1045,11 @@ int main()
     IC = DC = errorFlag = parseInstructionResult = 0;
     labelList *allLabelsList = createList();
     char trimmedLine[MAX_TOKEN_LEN+1];
-    char lines[][MAX_TOKEN_LEN+1] = {"MAIN: mov r3, LENGTH", ".entry ABC", "  ; dfgg", "LOOP: jmp L1(#-1,r6)", 
-        "prn #-5", "bne LOOP(r4,r5)", "sub r1, r4", "bne END", "L1: inc K", "bne LOOP(K,STR)",
-        "END: stop", "STR: .string \"abcdef\"", "LENGTH: .data 6, -9 ,15", "K: .data 22"};
-    for (int row = 0; row <14; row++) {
+    char lines[][MAX_TOKEN_LEN+1] = {"; file ps.as", "\n", ".entry LENGTH", ".extern W", 
+        "MAIN: mov r3, LENGTH", "LOOP: jmp L1(#-1,r6)", 
+        "prn #-5", "bne W(r4,r5)", "sub r1, r4", "bne L3", "L1: inc K", ".entry LOOP", "bne LOOP(K,W)",
+        "END: stop", "STR: .string \"abcdef\"", "LENGTH: .data 6, -9 ,15", "K: .data 22", ".extern L3"};
+    for (int row = 0; row <19; row++) {
         if (isStringEmpty(lines[row], strlen(lines[row]))) {
             continue;
         }
@@ -874,16 +1061,37 @@ int main()
             errorFlag++;
         }
     }
-    printf("There were %d errors\n", errorFlag);
+    incrementDataLabels (allLabelsList, IC);
+    IC = 0;
+    if (errorFlag > 0) {
+        printf("There were %d errors\n", errorFlag);
+        freeList(allLabelsList);
+        exit(0);
+    }
+    labelList *externList = createList();
+    errorFlag = 0;
+    for (int row = 0; row <19; row++) {
+        if (isStringEmpty(lines[row], strlen(lines[row]))) {
+            continue;
+        }
+        trimString(lines[row], trimmedLine, strlen(lines[row]));
+        if (trimmedLine[0] == COMMENT_CHAR) {
+            continue;
+        }
+        if (!parseLineSecondPass(trimmedLine, row+1, &IC, commandsArray, allLabelsList, externList)) {
+            errorFlag++;
+        }
+    }
+    
     for (int i=0; i < IC; i++) {
         printf("%s\n", commandsArray[i]);
     }
     for (int j=0; j < DC; j++) {
         printf("%s\n", dataArray[j]);
     }
-    incrementDataLabels (allLabelsList, IC);
-    printList(allLabelsList);
-    freeList (allLabelsList);
+    printList(externList);
+    freeList(allLabelsList);
+    freeList(externList);
 
     return 0;
 }
