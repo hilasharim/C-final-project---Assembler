@@ -1,0 +1,2 @@
+assembler: constants.c constants.h symbolsTable.c symbolsTable.h stringParsing.c stringParsing.h integerParsing.c integerParsing.h operandParsing.c operandParsing.h firstPass.c firstPass.h secondPass.c secondPass.h outputGenerator.c outputGenerator.h
+	gcc -Wall -ansi -pedantic -g constants.c symbolsTable.c stringParsing.c integerParsing.c operandParsing.c firstPass.c secondPass.c outputGenerator.c assembler.c -o assembler
