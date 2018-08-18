@@ -7,6 +7,9 @@
 #include "symbolsTable.h"
 #include "secondPass.h"
 
+/*Function to build a memory word for a label. Receives the label's address and whether it is realocatable or external. builds the 12 most significant
+bits based on the translation of the label's address to and integer represented in base 2, and the 2 most insignificant bits are ARE, based on the RFlag
+and the EFlag*/
 static void buildLabelAddressWord(int labelAddress, int RFlag, int EFlag, char commandTarget[]) {
     const char ARE[][ARE_LEN] = {"00", "10", "01"};
     char addressAsString[MAX_WORD_LEN+1];
@@ -23,6 +26,8 @@ static void buildLabelAddressWord(int labelAddress, int RFlag, int EFlag, char c
     }
 }
 
+/*Function to parse a label operand in the second pass. Checks first that the label exists in the labels list and gets its values. If it does exist,
+builds the memory word for the label. If the label is marked as external, adds it to the externals list.*/
 static int parseLabelOperandSecondPass(char labelName[], char commandTarget[], labelList *allLabelsList, labelList *externList, int commandPosition) {
     int labelFoundFlag, labelValue, labelRFlag, labelEFlag;
     labelFoundFlag = getLabelValueARE(allLabelsList, labelName, &labelValue, &labelRFlag, &labelEFlag);
@@ -36,7 +41,9 @@ static int parseLabelOperandSecondPass(char labelName[], char commandTarget[], l
     return 1;
 }
 
-/*return 0 if label not found, 1 if successful*/
+/*Function to parse a single operand in the second pass. Returns 0 if label not found, 1 if successful. Function always skips the first word.
+If the addressing method of the operator is 0 or 3, only increments IC. Otherwise, builds the memory word for the label in addressing method 1 and 2. If
+addressing method 2, sends the internal parameters to be parsed.*/
 static int parseOneOperandCommandSecondPass(char *operand, char commandsArray[][MAX_WORD_LEN+1], int *IC, labelList *allLabelsList, labelList *externList) {
     int addressingMethod, currOperand;
     char operandValues[MAX_PARAMETERS][MAX_TOKEN_LEN+1];
@@ -66,6 +73,8 @@ static int parseOneOperandCommandSecondPass(char *operand, char commandsArray[][
     return 1;
 }
 
+/*Function to handle an operator expecting two operands in the second pass. Splits the operands and gets their addressing method, increments IC as
+needed and sends each operand with addressing method 1 to be parsed.*/
 static int parseOperatorWithTwoOperandsSecondPass(char *string, char commandsArray[][MAX_WORD_LEN+1], int *IC, labelList *allLabelsList, labelList *externList) {
     int srcOperandAddressing, destOperandAddressing;
     char splitOperands [MAX_PARAMETERS][MAX_TOKEN_LEN+1];
@@ -95,6 +104,9 @@ static int parseOperatorWithTwoOperandsSecondPass(char *string, char commandsArr
     return 1;
 }
 
+/*Function to parse an operand based on the operator type in the second pass. Receives the operand, the instructions counter, 
+the operator index, the label list and the externals list, and sends the operand to be parsed based on the number of parameters the operator
+is expected to have.*/
 static int parseOperatorSecondPass(int lineNumber, char *operand, int *IC, int operatorIndex, char commandsArray[][MAX_WORD_LEN+1], labelList *allLabelsList, labelList *externList) {
     char trimmedOperand[MAX_TOKEN_LEN+1];
     int operatorParseResult = 0;
@@ -119,6 +131,8 @@ static int parseOperatorSecondPass(int lineNumber, char *operand, int *IC, int o
     return 1;
 }
 
+/*Function to parse a .entry instruction in the second pass. Tries to set the entryFlag of the label in the labels list. Returns 1 is successful,
+and 0 if the label is not found in the label list or if the label is already declared as external.*/
 static int parseEntrySecondPass(int lineNumber, char labelname[MAX_TOKEN_LEN+1], labelList *allLabelsList) {
     int parseResult = setEntryFlag(allLabelsList, labelname);
     if (parseResult == 0 ) {
@@ -132,6 +146,9 @@ static int parseEntrySecondPass(int lineNumber, char labelname[MAX_TOKEN_LEN+1],
     return 1;
 }
 
+/*Function to parse a single line in the second pass. Returns 0 if an error was found in the line and 1 otherwise.
+Ignores the label at the beginning of the line, if it exists. Gets the instruction and sends the operand to be parsed according to instruction found.
+As this is the second pass, label names and instruction names must be legal, so this is not confirmed again in this function.*/
 static int parseLineSecondPass(char *line, int lineNumber, int *IC, char commandsArray[][MAX_WORD_LEN+1], labelList *allLabelsList, labelList *externList) {
     char label[MAX_TOKEN_LEN+1], restOfString[MAX_TOKEN_LEN+1], trimmedRestOfString[MAX_TOKEN_LEN+1], operand[MAX_TOKEN_LEN+1];
     int instruction, parseInstructionResult;
@@ -156,6 +173,9 @@ static int parseLineSecondPass(char *line, int lineNumber, int *IC, char command
     return parseInstructionResult;
 }
 
+/*Function that receives a file pointer to an input file, a pointer to the instructions counter, the commands array that was generated in the first
+pass, the label list generated in the first pass, and an empty externals list to save labels marked as externals and the memory location of the commands
+that use them, and parses the file line by line. Returns 1 if an error was found in any line, and 0 otherwise.*/
 int parseFileSecondPass(FILE *fp, int *IC, char commandsArray[][MAX_WORD_LEN+1], labelList *allLabelsList, labelList *externList) {
     int errorFlag, lineNumber;
     char line[MAX_LINE_LEN+1];

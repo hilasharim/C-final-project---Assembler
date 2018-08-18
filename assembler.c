@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Missing command line parameter. Must provide at least one file.\n");
         exit(1);
     }
+	/*go over all files*/
     for (currArgv = 1; currArgv < argc; currArgv++) {
         char commandsArray[MAX_COMMAND_ARRAY_LEN][MAX_WORD_LEN+1];
         char dataArray[MAX_COMMAND_ARRAY_LEN][MAX_WORD_LEN+1];
@@ -37,10 +38,12 @@ int main(int argc, char *argv[]) {
             freeList(allLabelsList);
             continue;
         }
+        /*increment data labels by IC to separate data from commmands*/
         incrementDataLabels (allLabelsList, IC);
         IC = errorFlag = 0;
         externList = createList();
         fprintf(stdout, "Parsing file: %s, second pass\n", completeFileName);
+        /*return to the beginning of the file*/
         fseek(currFilePointer, 0, SEEK_SET);
         errorFlag = parseFileSecondPass(currFilePointer, &IC, commandsArray, allLabelsList, externList);
         if (errorFlag) {
@@ -54,9 +57,9 @@ int main(int argc, char *argv[]) {
         printObjectFile(argv[currArgv], commandsArray, dataArray, IC, DC);
         printExternalsFile(argv[currArgv], externList);
         printEntriesFile(argv[currArgv], allLabelsList);
+        fclose(currFilePointer);
         freeList(allLabelsList);
         freeList(externList);
-        fclose(currFilePointer);
     }
     return 0;
 } 

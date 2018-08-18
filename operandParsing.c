@@ -6,8 +6,8 @@
 #include "integerParsing.h"
 #include "operandParsing.h"
 
-/*function that checks if label name is legal. return -1 if reserved word, 0 if not but 
-not legal, and 1 if legal*/
+/*Function that checks if label name is legal. Returns -1 if reserved word, 0 if not reserved but not legal, and 1 if legal.
+A legal label starts with a letter and the rest of its characters are alphanumeric.*/
 int isLabelLegal (char *label) {
     int pos;
     if (indexOf(registers, totalRegisters, label) >= 0 || indexOf(instructions, totalInstructions, label) >= 0 || indexOf(operations, totalOperations, label) >= 0) {
@@ -24,7 +24,7 @@ int isLabelLegal (char *label) {
     return 1;
 }
 
-/*function to check if a given string is legal for a .string instruction, by checking if it is enclosed
+/*Function to check if a given string is legal for a .string instruction, by checking if it is enclosed
 by the specified character and contains only printable characters. returns 0 if not legal, otherwise 1.*/
 int isStringLegal (char *str) {
     if (str[0] != STRING_ENCLOSER || str[strlen(str)-1] != STRING_ENCLOSER) {
@@ -41,6 +41,11 @@ int isStringLegal (char *str) {
     return 1;
 }
 
+/*Function to parse an operand given after a .data instruction. All numbers are translated to their binary representation and inserted to dataTargetArray
+starting at the specified position. Returns -1 if any token in the operand was null, -2 if any token is not a legal integer and the number of integers
+added to the array otherwise. Function first splits the operand using ',' as the delimiter, then checks that none of the tokens are null (indicates
+comma in a wrong position) and that all tokens can be translated to integers. Then goes over all integers one by one, translates them and inserts
+the translation to the correct position in the target array.*/
 int parseDataArray(char *parametersString, char dataTargetArray[][MAX_WORD_LEN+1], int targetStartPos) {
     char stringSplitRes[MAX_PARAMETERS][MAX_TOKEN_LEN+1];
     char stringSplitTrimRes[MAX_PARAMETERS][MAX_TOKEN_LEN+1];
@@ -68,6 +73,9 @@ int parseDataArray(char *parametersString, char dataTargetArray[][MAX_WORD_LEN+1
     return numSplitParams;
 }
 
+/*Function to parse an operand given after a .string instruction. Returns 0 if the string is not legal, and the string's length including \0 otherwise.
+Checks first the the operand is a legal string, then converts the ASCII values of its characters to base 2 and inserts them to dataTargetArray at the
+specified position*/
 int parseStringInstruction (char *string, char dataTargetArray[][MAX_WORD_LEN+1], int targetStartPos) {
     int currPos;
     char currAsciiVal[MAX_ASCII_LEN+1];
@@ -83,10 +91,9 @@ int parseStringInstruction (char *string, char dataTargetArray[][MAX_WORD_LEN+1]
     return strlen(string)-1;
 }
 
-/*function to check if a label exists at the beginning of a string. returns 1 if legal label
-was found, returns -2 if no label was found. returns -1 if
-the label is a reserved word, returns 0 if label not legal for another reason.
-copies trimmed label to the target array.*/
+/*Function to check if a label exists at the beginning of a string. returns 1 if legal label was found, -2 if no label was found, -1 if the label 
+is a reserved word, and 0 if label not legal for another reason. copies trimmed label to the target array. Works by finding the position of the first ':',
+and treating the string until that position as the label*/
 int getLabel(char *string, char labelTarget[MAX_TOKEN_LEN+1], char restOfString[MAX_TOKEN_LEN+1]) {
     char *delimPos;
     char labelNotTrimmed[MAX_TOKEN_LEN+1];
@@ -107,8 +114,8 @@ int getLabel(char *string, char labelTarget[MAX_TOKEN_LEN+1], char restOfString[
     }
 }
 
-/*return two operands comprising a two operand operator, return -1 if comma in wrong position,
--2 if more than 2 operands, 1 otherwise*/
+/*Function to split a string that should be comprised of two operands to the single operands comprising it. Returns -1 if a comma was found in a 
+wrong position, -2 if more or less than two operands were found and 1 otherwise. copies the trimmed operands to operandTargetArray */
 int getTwoOperands(char *string, char operandTargetArray[][MAX_TOKEN_LEN+1]) {
     int numSplitParams, currPos, nullPos;
     char internalParams[MAX_PARAMETERS][MAX_TOKEN_LEN+1];
@@ -128,8 +135,8 @@ int getTwoOperands(char *string, char operandTargetArray[][MAX_TOKEN_LEN+1]) {
     return 1;
 }
 
-/*copy the three operands comprising addressing method 2 to operandValuesArray. return 0 if
-structure does not correspond to addressing method 2, and 1 otherwise*/
+/*Function to copy the three operands comprising addressing method 2 to operandValuesArray. Returns 0 if structure does not correspond to addressing method 2, 
+and 1 otherwise.*/
 static int parseAddressingMethod2(char *operand, char operandValuesArray[][MAX_TOKEN_LEN+1]) {
     char *delimPos;
     if (operand[strlen(operand)-1] != ')') {
@@ -150,9 +157,8 @@ static int parseAddressingMethod2(char *operand, char operandValuesArray[][MAX_T
     return 1;
 }
 
-/*function to parse a single instruction operand. returns -1 if operand is not legal, -2 if label not legal, 
-addressing type if the operand is legal. copies the value of the operand to the operandValuesArray,
-max 3 parameters (for addressing 2)*/
+/*Function to parse a single operand. Returns -1 if operand is not legal, -2 if label is not legal, and the operand's addressing type if the operand is legal. 
+Copies the value of the operand to the operandValuesArray, max 3 parameters (for addressing 2)*/
 int parseSingleOperand(char *operand, char operandValuesArray[][MAX_TOKEN_LEN+1], int operandAddressingMethod[]) {
     char trimmedOperand[MAX_TOKEN_LEN+1];
     int operandOneAddressingMethod, operandTwoAddressingMethod;
@@ -192,18 +198,23 @@ int parseSingleOperand(char *operand, char operandValuesArray[][MAX_TOKEN_LEN+1]
     return -1;
 }
 
-/*return -1 if no instruction was found or not in array, otherwise return the index of the found instruction in instructionArray*/
+/*Function to get the instruction or operator at the beginning of a string. Returns -1 if no instruction was found or the found instruction is not found in
+instructionsArray, otherwise returns the index of the found instruction in instructionArray. Copies the instruction's operand (the rest of the string) to 
+operand. Receives a string to find an instruction in, and an array of possible instructions. Finds the next position of a space or a tab, and checks if the word
+until that postion appears in instructionsArray.*/
 int getInstruction(char *string, char instructionsArray[][MAX_TOKEN_LEN+1], int instructionsArrayLen, char operand[MAX_TOKEN_LEN+1]) {
-    char *delimPos;
+    char *delimPosSpace, *delimPosTab, *delimPos;
     char instructionNotTrimmed[MAX_TOKEN_LEN+1];
     char instructionTrimmed[MAX_TOKEN_LEN+1];
-    delimPos = getNextDelimiterPos(string, ' ');
+    delimPosSpace = getNextDelimiterPos(string, ' ');
+    delimPosTab = getNextDelimiterPos(string, '\t');
     
-    if (*delimPos == '\0') { /*' ' was not found, check if instruction with no operands*/
+    if (*delimPosSpace == '\0' && *delimPosTab == '\0') { 
         strcpy(instructionNotTrimmed, string);
         operand[0] = '\0';
     }
     else {
+        delimPos = delimPosSpace <= delimPosTab ? delimPosSpace:delimPosTab;
         strncpy(instructionNotTrimmed, string, delimPos - string);
         instructionNotTrimmed[delimPos - string] = '\0';
         strncpy(operand, delimPos+1, strlen(string) - (delimPos - string +1));

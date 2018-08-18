@@ -46,6 +46,7 @@ void trimString (char *src, char *dest, int srcLen) {
     }
 }
 
+/*Function that looks for the first appearance of a given character in a string. returns a pointer to the corresponding location in the string*/
 char* getNextDelimiterPos(char *str, char delimiter) {
     char *delimiterPos = strchr(str, delimiter);
     if (!delimiterPos) {
@@ -54,6 +55,9 @@ char* getNextDelimiterPos(char *str, char delimiter) {
     return delimiterPos;
 }
 
+/*Function to split a string into tokens by a given delimiter character. the found tokens are copied into the targetArray. Returns the total
+number of tokens copied. Function uses the getNextDelimiterPos on the string until no more delimiters are found. for each delimiter position, the
+string from the last delimiter position (not including) is copied until the position of the current delimiter position*/
 int splitString(char *str, char targetArray[][MAX_TOKEN_LEN+1], char delimiter) {
     int currTargetArrayPos, totalParsed;
     char *prevDelimPos, *currDelimPos;
@@ -76,7 +80,7 @@ int splitString(char *str, char targetArray[][MAX_TOKEN_LEN+1], char delimiter) 
     return totalParsed;
 }
 
-/*search for string in given string array. return first position in array, or -1 if not found */
+/*Function to search for string in given string array. return first position in array, or -1 if not found */
 int indexOf (char stringArray[][MAX_TOKEN_LEN+1], int arrayLen, char searchString[]) {
     int foundIndex = -1;
     int currPosition = 0;
@@ -89,7 +93,8 @@ int indexOf (char stringArray[][MAX_TOKEN_LEN+1], int arrayLen, char searchStrin
     return foundIndex;
 }
 
-/*function to check if a string contains any whitespace characters*/
+/*Function to check if a string contains any whitespace characters. returns 1 if any whitespace found, otherwise returns 0.
+Goes over string character by character*/
 int hasWhitespace (char *str) {
     while (*str != '\0') {
         if (isspace(*str)) {
